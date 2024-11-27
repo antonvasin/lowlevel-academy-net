@@ -1,6 +1,6 @@
-TARGET = bin/dbview
-SRC = $(wildcard src/*.c)
-OBJ = $(patsubst src/%.c, obj/%.o, $(SRC))
+TARGET = bin/server
+SRC = $(wildcard *.c)
+OBJ = $(patsubst %.c, %.o, $(SRC))
 
 run: clean default
 	./$(TARGET)
@@ -8,9 +8,9 @@ run: clean default
 default: $(TARGET)
 
 clean:
-	rm -f obj/*.o
+	mkdir -p bin
+	rm -f *.o
 	rm -f bin/*
-	rm -f *.db
 
 $(TARGET): $(OBJ)
 	gcc -o $@ $?
