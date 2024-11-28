@@ -1,21 +1,25 @@
-TARGET = bin/server
-SRC = $(wildcard *.c)
-OBJ = $(patsubst %.c, %.o, $(SRC))
+SERVER = bin/server
+CLIENT = bin/client
+# SRC = $(wildcard src/*.c)
+# OBJ = $(patsubst src/%.c, obj/%.o, $(SRC))
 
 run: clean default
-	./$(TARGET)
+	./$(SERVER)
 
-default: $(TARGET)
+default: $(CLIENT)
 
 clean:
 	mkdir -p bin
-	rm -f *.o
+	# mkdir -p obj
+	# rm -f obj/*.o
 	rm -f bin/*
+	rm -f *.db
 
-$(TARGET): $(OBJ)
-	gcc -o $@ $?
+$(SERVER): server.c
+	gcc -o $(SERVER) server.c
 
-obj/%.o : src/%.c
-	gcc -c $< -o $@ -Iinclude
+$(CLIENT): $(SERVER) client.c
+	gcc -o $(CLIENT) client.c
 
-
+# obj/%.o : src/%.c
+# 	gcc -c $< -o $@ -Iinclude
