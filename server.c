@@ -49,6 +49,7 @@ int main() {
   socklen_t client_len = sizeof(client_addr);
   fd_set read_fds, write_fds;
   int slot;
+  struct timeval timeout;
 
   init_clients();
 
@@ -96,7 +97,11 @@ int main() {
       }
     }
 
-    if (select(nfds, &read_fds, &write_fds, NULL, NULL) == -1) {
+    // Wait for 5s max for select to unblock
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+
+    if (select(nfds, &read_fds, &write_fds, NULL, &timeout) == -1) {
       perror("select");
       exit(EXIT_FAILURE);
     }
@@ -132,6 +137,8 @@ int main() {
           close(clientStates[i].fd);
           clientStates[i].fd = -1;
           clientStates[i].state = STATE_DISCONNECTED;
+          // Clear buffer to avoid reading data from previous request
+          memset(&clientStates[i].buffer, '\0', BUF_SIZE);
           printf("Client disconnected on error\n");
         } else {
           printf("Received data from client: %s", clientStates[i].buffer);
