@@ -24,19 +24,19 @@ typedef struct {
   char buffer[BUF_SIZE];
 } clientstate_t;
 
-clientstate_t clientStates[MAX_CLIENTS];
+clientstate_t g_client_states[MAX_CLIENTS];
 
 void init_clients() {
   for (int i = 0; i < MAX_CLIENTS; i++) {
-    clientStates[i].fd = -1; // free slot
-    clientStates[i].state = STATE_NEW;
-    memset(&clientStates[i].buffer, '\0', BUF_SIZE);
+    g_client_states[i].fd = -1; // free slot
+    g_client_states[i].state = STATE_NEW;
+    memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
   }
 }
 
 int find_free_slot() {
   for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (clientStates[i].fd == -1) {
+    if (g_client_states[i].fd == -1) {
       return i;
     }
   }
@@ -91,9 +91,9 @@ int main() {
 
     // Add active connections to the read set while maintaining nfds
     for (int i = 0; i < MAX_CLIENTS; i++) {
-      if (clientStates[i].fd != -1) {
-        FD_SET(clientStates[i].fd, &read_fds);
-        if (clientStates[i].fd >= nfds) nfds = clientStates[i].fd + 1;
+      if (g_client_states[i].fd != -1) {
+        FD_SET(g_client_states[i].fd, &read_fds);
+        if (g_client_states[i].fd >= nfds) nfds = g_client_states[i].fd + 1;
       }
     }
 
@@ -121,28 +121,33 @@ int main() {
         printf("Server is full, dropping connection\n");
         close(conn_fd);
       } else {
-        clientStates[slot].fd = conn_fd;
-        clientStates[slot].state = STATE_CONNECTED;
+        g_client_states[slot].fd = conn_fd;
+        g_client_states[slot].state = STATE_CONNECTED;
       }
     }
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
-      if (clientStates[i].fd != -1 &&
-          FD_ISSET(clientStates[i].fd, &read_fds)) {
-        ssize_t bytes_read = read(clientStates[i].fd,
-                                  &clientStates[i].buffer,
-                                  sizeof((clientStates[i].buffer)));
+      if (g_client_states[i].fd != -1 &&
+          FD_ISSET(g_client_states[i].fd, &read_fds)) {
+        ssize_t bytes_read = read(g_client_states[i].fd,
+                                  &g_client_states[i].buffer,
+                                  sizeof((g_client_states[i].buffer)));
 
         if (bytes_read <= 0) {
-          close(clientStates[i].fd);
-          clientStates[i].fd = -1;
-          clientStates[i].state = STATE_DISCONNECTED;
+          close(g_client_states[i].fd);
+          g_client_states[i].fd = -1;
+          g_client_states[i].state = STATE_DISCONNECTED;
           // Clear buffer to avoid reading data from previous request
-          memset(&clientStates[i].buffer, '\0', BUF_SIZE);
+          memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
           printf("Client disconnected on error\n");
         } else {
-          printf("Received data from client: %s", clientStates[i].buffer);
-          // write(clientStates[i].fd, clientStates[i].buffer, sizeof(clientStates[i].buffer));
+          printf("Received data from client: %s", g_client_states[i].buffer);
+          write(g_client_states[i].fd, g_client_states[i].buffer, sizeof(g_client_states[i].buffer));
+          close(g_client_states[i].fd);
+          g_client_states[i].fd = -1;
+          g_client_states[i].state = STATE_DISCONNECTED;
+          memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
+          printf("Responded to client\n");
         }
       }
     }
