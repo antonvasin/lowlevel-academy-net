@@ -1,25 +1,32 @@
-SERVER = bin/server
-CLIENT = bin/client
-# SRC = $(wildcard src/*.c)
-# OBJ = $(patsubst src/%.c, obj/%.o, $(SRC))
+TARGET_SRV = bin/dbserver
+TARGET_CLI = bin/dbcli
+
+SRC_SRV = $(wildcard src/srv/*.c)
+OBJ_SRV = $(SRC_SRV:src/srv/%.c=obj/srv/%.o)
+
+SRC_CLI = $(wildcard src/cli/*.c)
+OBJ_CLI = $(SRC_CLI:src/cli/%.c=obj/cli/%.o)
 
 run: clean default
-	./$(SERVER)
+	./$(TARGET_SRV) -f ./mynewdb.db -n -p 8080 &
+	./$(TARGET_CLI) 127.0.0.1
+	kill -9 $$(pidof dbserver)
 
-default: $(CLIENT)
+default: $(TARGET_SRV) $(TARGET_CLI)
 
 clean:
-	mkdir -p bin
-	# mkdir -p obj
-	# rm -f obj/*.o
+	rm -f obj/srv/*.o
 	rm -f bin/*
 	rm -f *.db
 
-$(SERVER): server.c
-	gcc -o $(SERVER) server.c
+$(TARGET_SRV): $(OBJ_SRV)
+	gcc -o $@ $?
 
-$(CLIENT): $(SERVER) client.c
-	gcc -o $(CLIENT) client.c
+$(OBJ_SRV): obj/srv/%.o: src/srv/%.c
+	gcc -c $< -o $@ -Iinclude
 
-# obj/%.o : src/%.c
-# 	gcc -c $< -o $@ -Iinclude
+$(TARGET_CLI): $(OBJ_CLI)
+	gcc -o $@ $?
+
+$(OBJ_CLI): obj/cli/%.o: src/cli/%.c
+	gcc -c $< -o $@ -Iinclude
