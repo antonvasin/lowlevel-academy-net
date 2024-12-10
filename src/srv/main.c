@@ -2,11 +2,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <poll.h>
+
+#include "file.h"
+#include "parse.h"
+#include "common.h"
 
 #define MAX_CLIENTS 256
 #define PORT 5555
@@ -52,14 +57,25 @@ int find_slot_by_fd(int fd) {
   return -1;
 }
 
-int main() {
+void print_usage(char *argv[]) {
+  printf("Usage: %s -n -f <database file>\n", argv[0]);
+  printf("\t-f - (required) path to database file\n");
+  printf("\t-p - (required) port to use\n");
+  printf("\t-n - create database file\n");
+  printf("\t-a - [name,address,hours] add record to database\n");
+  printf("\t-l - list records\n");
+  printf("\t-u - [name,hours] update employee's hours\n");
+  printf("\t-r - remove record by employee name\n");
+  return;
+}
+
+void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t *emplyees) {
   int listen_fd, conn_fd, freeSlot;
   struct sockaddr_in server_addr, client_addr;
   socklen_t client_len = sizeof(client_addr);
 
   struct pollfd fds[MAX_CLIENTS + 1];
   int nfds = 1;
-  int opt = 1;
 
   init_clients();
 
@@ -69,6 +85,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
+  int opt = 1;
   if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
     perror("setsocketopt");
     exit(EXIT_FAILURE);
@@ -89,7 +106,7 @@ int main() {
   if (listen(listen_fd, 10) == -1) {
     perror("listen");
     close(listen_fd);
-    return -1;
+    // return -1;
   }
 
   printf("Listening on port %d...\n", PORT);
@@ -165,19 +182,126 @@ int main() {
             nfds--;
             printf("Client %d disconnected on a error\n", i);
           }
-        // Handle request
+          // Handle request
         } else {
           printf("Received data from the client: %s\n", g_client_states[slot].buffer);
-          // write(g_client_states[i].fd, g_client_states[i].buffer, sizeof(g_client_states[i].buffer));
-          // close(g_client_states[i].fd);
-          // g_client_states[i].fd = -1;
-          // g_client_states[i].state = STATE_DISCONNECTED;
-          // memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
-          // printf("Responded to client\n");
+
+          // TODO:
+          // handle_client_fsm();
         }
       }
     }
   }
+}
+
+int main(int argc, char *argv[]) {
+  char *filepath = NULL;
+  char *addstring = NULL;
+  char *removestring = NULL;
+  char *updatestring = NULL;
+  bool newfile = false;
+  bool list = false;
+  int port = -1;
+  int c;
+  int dbfd = -1;
+  struct dbheader_t *dbhdr = NULL;
+  struct employee_t *employees = NULL;
+
+  while ((c = getopt(argc, argv, "nf:p:a:lr:u:")) != -1) {
+    switch (c) {
+      case 'n':
+        newfile = true;
+        break;
+      case 'f':
+        filepath = optarg;
+        break;
+      case 'p':
+        port = atoi(optarg);
+        break;
+      case 'a':
+        addstring = optarg;
+        break;
+      case 'l':
+        list = true;
+        break;
+      case 'r':
+        removestring = optarg;
+        break;
+      case 'u':
+        updatestring = optarg;
+        break;
+      case '?':
+        print_usage(argv);
+        break;
+      default:
+        return -1;
+    }
+  }
+
+  if (filepath == NULL) {
+    printf("Filepath is a required argument.\n");
+    print_usage(argv);
+    return 0;
+  }
+
+  if (port == -1) {
+    printf("Port is a required argument.\n");
+    print_usage(argv);
+    return 0;
+  }
+
+  if (newfile) {
+    dbfd = create_db_file(filepath);
+    if (dbfd == STATUS_ERROR) {
+      printf("Unable to create database file\n");
+      return -1;
+    }
+
+    if (create_db_header(dbfd, &dbhdr) == STATUS_ERROR) {
+      printf("Failed to create db header\n");
+      return -1;
+    }
+  } else {
+    dbfd = open_db_file(filepath);
+
+    if (dbfd == -1) {
+      printf("Unable to open database file\n");
+      return -1;
+    }
+
+    if (validate_db_header(dbfd, &dbhdr) == STATUS_ERROR) {
+      printf("Failed to validate db file\n");
+      return -1;
+    }
+
+  }
+
+  if (read_employees(dbfd, dbhdr, &employees) != STATUS_SUCCESS) {
+    printf("Failed to read employees\n");
+    return 0;
+  }
+
+  if (addstring) {
+    dbhdr->count++;
+    employees = realloc(employees, dbhdr->count*(sizeof(struct employee_t)));
+    add_employee(dbhdr, employees, addstring);
+  }
+
+  if (updatestring) {
+    update_employee(dbhdr, employees, updatestring);
+  }
+
+  if (removestring) {
+    remove_employee(dbhdr, employees, removestring);
+  }
+
+  if (list) {
+    list_employees(dbhdr, employees);
+  }
+
+  poll_loop(5555, dbhdr, employees);
+
+  output_file(dbfd, dbhdr, employees);
 
   return 0;
 }
