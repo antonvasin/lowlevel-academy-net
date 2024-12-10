@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-// #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <poll.h>
 
 #define MAX_CLIENTS 256
 #define PORT 5555
@@ -43,19 +43,34 @@ int find_free_slot() {
   return -1; // no free slots
 }
 
+int find_slot_by_fd(int fd) {
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    if (g_client_states[i].fd == fd) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 int main() {
-  int listen_fd, conn_fd, nfds, freeSlot;
+  int listen_fd, conn_fd, freeSlot;
   struct sockaddr_in server_addr, client_addr;
   socklen_t client_len = sizeof(client_addr);
-  fd_set read_fds, write_fds;
-  int slot;
-  struct timeval timeout;
+
+  struct pollfd fds[MAX_CLIENTS + 1];
+  int nfds = 1;
+  int opt = 1;
 
   init_clients();
 
   // Create listening socket
   if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     perror("socket");
+    exit(EXIT_FAILURE);
+  }
+
+  if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+    perror("setsocketopt");
     exit(EXIT_FAILURE);
   }
 
@@ -79,36 +94,33 @@ int main() {
 
   printf("Listening on port %d...\n", PORT);
 
+  memset(fds, 0, sizeof(fds));
+  fds[0].fd = listen_fd;
+  fds[0].events = POLLIN;
+  nfds = 1;
+
   // Main loop
   while (1) {
-    // Clear FD set
-    FD_ZERO(&read_fds);
-    FD_ZERO(&write_fds);
-
-    // Add listening socket to the read set
-    FD_SET(listen_fd, &read_fds);
-    nfds = listen_fd + 1;
+    int fd_i = 1;
 
     // Add active connections to the read set while maintaining nfds
     for (int i = 0; i < MAX_CLIENTS; i++) {
       if (g_client_states[i].fd != -1) {
-        FD_SET(g_client_states[i].fd, &read_fds);
-        if (g_client_states[i].fd >= nfds) nfds = g_client_states[i].fd + 1;
+        fds[fd_i].fd = g_client_states[i].fd;
+        fds[fd_i].events = POLLIN;
+        fd_i++;
       }
     }
 
-    // Wait for 5s max for select to unblock
-    timeout.tv_sec = 5;
-    timeout.tv_usec = 0;
-
-    if (select(nfds, &read_fds, &write_fds, NULL, &timeout) == -1) {
-      perror("select");
+    int n_events = poll(fds, fd_i, -1); // -1 means no timeout
+    if (n_events == -1) {
+      perror("poll");
       exit(EXIT_FAILURE);
     }
 
-    // Check for the new connection and add it to global state
-    if (FD_ISSET(listen_fd, &read_fds)) {
-      // Skip to next connection if can't accept current one
+    // Check for new connections
+    if (fds[0].revents & POLLIN) {
+
       if ((conn_fd = accept(listen_fd, (struct sockaddr*)&client_addr, &client_len)) == -1) {
         perror("accept");
         continue;
@@ -117,37 +129,51 @@ int main() {
       printf("New connection from %s:%d\n",
           inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-      if ((slot = find_free_slot()) == -1) {
-        printf("Server is full, dropping connection\n");
+      if ((freeSlot = find_free_slot()) == -1) {
+        printf("No free connection slots, sorry.\n");
         close(conn_fd);
       } else {
-        g_client_states[slot].fd = conn_fd;
-        g_client_states[slot].state = STATE_CONNECTED;
+        g_client_states[freeSlot].fd = conn_fd;
+        g_client_states[freeSlot].state = STATE_CONNECTED;
+        nfds++;
       }
+
+      n_events--;
     }
 
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-      if (g_client_states[i].fd != -1 &&
-          FD_ISSET(g_client_states[i].fd, &read_fds)) {
-        ssize_t bytes_read = read(g_client_states[i].fd,
-                                  &g_client_states[i].buffer,
-                                  sizeof((g_client_states[i].buffer)));
+    // Check for new events in tracked connections until we out of connections
+    // or events to process
+    for (int i = 0; i <= nfds && n_events > 0; i++) {
+      // We got new event at fds[i]
+      if (fds[i].revents & POLLIN) {
+        n_events--;
 
+        int fd = fds[i].fd;
+        int slot = find_slot_by_fd(fd);
+        ssize_t bytes_read = read(fd, &g_client_states[slot].buffer, sizeof(g_client_states[slot]));
+
+        // Handle read error
         if (bytes_read <= 0) {
-          close(g_client_states[i].fd);
-          g_client_states[i].fd = -1;
-          g_client_states[i].state = STATE_DISCONNECTED;
-          // Clear buffer to avoid reading data from previous request
-          memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
-          printf("Client disconnected on error\n");
+          perror("read");
+          close(fd);
+          if (slot == -1) {
+            printf("Trying to close connection that doesn't exist\n");
+          } else {
+            g_client_states[slot].fd = -1;
+            g_client_states[slot].state = STATE_DISCONNECTED;
+            memset(&g_client_states[slot].buffer, '\0', BUF_SIZE);
+            nfds--;
+            printf("Client %d disconnected on a error\n", i);
+          }
+        // Handle request
         } else {
-          printf("Received data from client: %s", g_client_states[i].buffer);
-          write(g_client_states[i].fd, g_client_states[i].buffer, sizeof(g_client_states[i].buffer));
-          close(g_client_states[i].fd);
-          g_client_states[i].fd = -1;
-          g_client_states[i].state = STATE_DISCONNECTED;
-          memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
-          printf("Responded to client\n");
+          printf("Received data from the client: %s\n", g_client_states[slot].buffer);
+          // write(g_client_states[i].fd, g_client_states[i].buffer, sizeof(g_client_states[i].buffer));
+          // close(g_client_states[i].fd);
+          // g_client_states[i].fd = -1;
+          // g_client_states[i].state = STATE_DISCONNECTED;
+          // memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
+          // printf("Responded to client\n");
         }
       }
     }
