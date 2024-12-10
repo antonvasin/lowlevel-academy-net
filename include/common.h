@@ -1,21 +1,34 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <stdint.h>
+
 #define STATUS_ERROR   -1
 #define STATUS_SUCCESS 0
-
-#define BUF_SIZE 4096
+#define PROTO_VER 100
 
 typedef enum {
-  STATE_NEW,
-  STATE_CONNECTED,
-  STATE_DISCONNECTED,
-} state_e;
+  MSG_HELLO_REQ,
+  MSG_HELLO_RESP,
+  MSG_EMPLOYEE_LIST_REQ,
+  MSG_EMPLOYEE_LIST_RESP,
+  MSG_EMPLOYEE_ADD_REQ,
+  MSG_EMPLOYEE_ADD_RESP,
+  MSG_EMPLOYEE_DEL_REQ,
+  MSG_EMPLOYEE_DEL_RESP
+} dbproto_type_e;
 
 typedef struct {
-  int fd;
-  state_e state;
-  char buffer[BUF_SIZE];
-} clientstate_t;
+  dbproto_type_e type;
+  uint16_t len;
+} dbproto_hdr_t;
+
+typedef struct {
+  uint16_t  proto;
+} dbproto_hello_req;
+
+typedef struct {
+  uint16_t  proto;
+} dbproto_hello_resp;
 
 #endif

@@ -11,6 +11,33 @@
 #include "common.h"
 #include "srvpoll.h"
 
+void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, clientstate_t *client) {
+  dbproto_hdr_t *hdr = (dbproto_hdr_t*)client->buffer;
+
+  hdr->type = ntohl(hdr->type);
+  hdr->len = ntohs(hdr->len);
+
+  if (client->state == STATE_HELLO) {
+    if (hdr->type != MSG_HELLO_REQ || hdr->len != 1) {
+      printf("Didn't get MSG_HELLO_REQ in HELLO state...\n");
+      // TODO: send error msg
+    }
+
+    dbproto_hello_req* hello = (dbproto_hello_req*)&hdr[1];
+    hello->proto = ntohs(hello->proto);
+    if (hello->proto != PROTO_VER) {
+      printf("Version mismatch.\n");
+      // TODO: send error
+    }
+
+    client->state = STATE_MSG;
+  }
+
+  if (client->state == STATE_MSG) {
+    printf("Can't handle MSG yet...\n");
+  }
+}
+
 void init_clients(clientstate_t *states) {
   for (int i = 0; i < MAX_CLIENTS; i++) {
     states[i].fd = -1; // free slot
