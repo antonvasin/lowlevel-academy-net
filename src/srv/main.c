@@ -12,50 +12,10 @@
 #include "file.h"
 #include "parse.h"
 #include "common.h"
+#include "srvpoll.h"
 
-#define MAX_CLIENTS 256
-#define PORT 5555
-#define BUF_SIZE 4096
-
-typedef enum {
-  STATE_NEW,
-  STATE_CONNECTED,
-  STATE_DISCONNECTED,
-} state_e;
-
-typedef struct {
-  int fd;
-  state_e state;
-  char buffer[BUF_SIZE];
-} clientstate_t;
 
 clientstate_t g_client_states[MAX_CLIENTS];
-
-void init_clients() {
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    g_client_states[i].fd = -1; // free slot
-    g_client_states[i].state = STATE_NEW;
-    memset(&g_client_states[i].buffer, '\0', BUF_SIZE);
-  }
-}
-
-int find_free_slot() {
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (g_client_states[i].fd == -1) {
-      return i;
-    }
-  }
-  return -1; // no free slots
-}
-
-int find_slot_by_fd(int fd) {
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (g_client_states[i].fd == fd) {
-      return i;
-    }
-  }
-  return -1;
-}
 
 void print_usage(char *argv[]) {
   printf("Usage: %s -n -f <database file>\n", argv[0]);
@@ -77,7 +37,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
   struct pollfd fds[MAX_CLIENTS + 1];
   int nfds = 1;
 
-  init_clients();
+  init_clients(g_client_states);
 
   // Create listening socket
   if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -95,7 +55,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
   memset(&server_addr, 0, sizeof(server_addr));
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(PORT);
+  server_addr.sin_port = htons(port);
 
   if (bind(listen_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
     perror("bind");
@@ -109,7 +69,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
     // return -1;
   }
 
-  printf("Listening on port %d...\n", PORT);
+  printf("Listening on port %d...\n", port);
 
   memset(fds, 0, sizeof(fds));
   fds[0].fd = listen_fd;
@@ -146,7 +106,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
       printf("New connection from %s:%d\n",
           inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-      if ((freeSlot = find_free_slot()) == -1) {
+      if ((freeSlot = find_free_slot(g_client_states)) == -1) {
         printf("No free connection slots, sorry.\n");
         close(conn_fd);
       } else {
@@ -166,16 +126,15 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
         n_events--;
 
         int fd = fds[i].fd;
-        int slot = find_slot_by_fd(fd);
+        int slot = find_slot_by_fd(fd, g_client_states);
         ssize_t bytes_read = read(fd, &g_client_states[slot].buffer, sizeof(g_client_states[slot]));
 
         // Handle read error
         if (bytes_read <= 0) {
           perror("read");
           close(fd);
-          if (slot == -1) {
-            printf("Trying to close connection that doesn't exist\n");
-          } else {
+
+          if (slot != -1) {
             g_client_states[slot].fd = -1;
             g_client_states[slot].state = STATE_DISCONNECTED;
             memset(&g_client_states[slot].buffer, '\0', BUF_SIZE);
@@ -187,7 +146,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
           printf("Received data from the client: %s\n", g_client_states[slot].buffer);
 
           // TODO:
-          // handle_client_fsm();
+          // handle_client_fsm(dbhdr, employees, &g_client_states[slot]);
         }
       }
     }
