@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "common.h"
+#define BUF_SIZE 4096
+
 typedef enum {
   PROTO_HELLO,
 } proto_type_e;
@@ -15,25 +18,17 @@ typedef struct {
   unsigned short len;
 } proto_hdr_t;
 
-void handle_client(int fd) {
-  char buf[4096] = {0};
-  read(fd, buf, sizeof(proto_hdr_t) + sizeof(int));
-  proto_hdr_t *hdr = buf;
-  hdr->type = ntohl(hdr->type);
-  hdr->len = ntohs(hdr->len);
+void send_hello(int fd) {
+  char buf[BUF_SIZE] = {0};
 
-  int *data = &hdr[1];
-  *data = ntohl(*data);
+  dbproto_hdr_t *hdr = (dbproto_hdr_t *)buf;
+  hdr->type = MSG_HELLO_REQ;
+  hdr->len = 1;
 
-  if (hdr->type != PROTO_HELLO) {
-    printf("Misfmatch type\n");
-    return;
-  }
+  hdr->type = htonl(hdr->type);
+  hdr->len = htons(hdr->len);
 
-  if (*data != 1) {
-    printf("Protocol mismatch\n");
-    return;
-  }
+  write(fd, buf, sizeof(dbproto_hdr_t));
 
   printf("Server connected. Protocol v1.\n");
 }
@@ -61,7 +56,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  handle_client(fd);
+  send_hello(fd);
 
   close(fd);
 
