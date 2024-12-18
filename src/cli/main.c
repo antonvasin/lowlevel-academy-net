@@ -1,8 +1,9 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdio.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -33,17 +34,42 @@ void send_hello(int fd) {
   printf("Server connected. Protocol v1.\n");
 }
 
+void print_usage(char * argv[]) {
+  printf("Usage: %s -h <host> -p <port>\n", argv[0]);
+  printf("\t-h - (required) host to connect to\n");
+  printf("\t-p - (required) port to use\n");
+  return;
+}
+
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <ip of the host>\n", argv[0]);
+  char *host = NULL;
+  int port = -1;
+  int c;
+
+  while ((c = getopt(argc, argv, "h:p:")) != -1) {
+    switch (c) {
+      case 'h':
+        host = optarg;
+        break;
+      case 'p':
+        port = atoi(optarg);
+        break;
+      default:
+        return -1;
+    }
+  }
+
+  if (host == NULL || port == -1) {
+    printf("Host and port are required\n");
+    print_usage(argv);
     return 0;
   }
 
   struct sockaddr_in serverInfo = {0};
 
   serverInfo.sin_family = AF_INET;
-  serverInfo.sin_addr.s_addr = inet_addr(argv[1]);
-  serverInfo.sin_port = htons(5555);
+  serverInfo.sin_addr.s_addr = inet_addr(host);
+  serverInfo.sin_port = htons(port);
 
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd == -1) {

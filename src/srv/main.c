@@ -112,6 +112,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
       } else {
         g_client_states[freeSlot].fd = conn_fd;
         g_client_states[freeSlot].state = STATE_CONNECTED;
+        printf("Slot %d has client %d\n", freeSlot, conn_fd);
         nfds++;
       }
 
