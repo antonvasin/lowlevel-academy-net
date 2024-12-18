@@ -131,7 +131,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
 
         // Handle read error
         if (bytes_read <= 0) {
-          perror("read");
+          // perror("read");
           close(fd);
 
           if (slot != -1) {
@@ -139,14 +139,13 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
             g_client_states[slot].state = STATE_DISCONNECTED;
             memset(&g_client_states[slot].buffer, '\0', BUF_SIZE);
             nfds--;
-            printf("Client %d disconnected on a error\n", i);
+            printf("Client disconnected\n");
           }
           // Handle request
         } else {
-          printf("Received data from the client: %s\n", g_client_states[slot].buffer);
+          // printf("Received data from the client: %s\n", g_client_states[slot].buffer);
 
-          // TODO:
-          // handle_client_fsm(dbhdr, employees, &g_client_states[slot]);
+          handle_client_fsm(dbhdr, emplyees, &g_client_states[slot]);
         }
       }
     }
@@ -258,7 +257,7 @@ int main(int argc, char *argv[]) {
     list_employees(dbhdr, employees);
   }
 
-  poll_loop(5555, dbhdr, employees);
+  poll_loop(port, dbhdr, employees);
 
   output_file(dbfd, dbhdr, employees);
 
