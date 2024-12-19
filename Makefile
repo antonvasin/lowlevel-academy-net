@@ -20,7 +20,7 @@ run: clean default
 		./$(TARGET_SRV) -f ./mynewdb.db -n -p $(PORT) & \
 		server_pid=$$!; \
 		sleep 1; \
-		{ timeout 2s ./$(TARGET_CLI) -h 127.0.0.1 -p $(PORT) || true; } \
+		{ timeout 2s ./$(TARGET_CLI) -h 127.0.0.1 -p $(PORT) -a "John Doe,123 Parkway Dr.,50" || true; } \
 	}
 default: $(TARGET_SRV) $(TARGET_CLI)
 

@@ -21,13 +21,30 @@ void list_employees(struct dbheader_t *dbhdr, struct employee_t *employees) {
 }
 
 int add_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *addstring) {
+
   char *name = strtok(addstring, ",");
+  if (name == NULL) {
+    return STATUS_ERROR;
+  }
+
   char *address = strtok(NULL, ",");
+  if (address == NULL) {
+    return STATUS_ERROR;
+  }
+
   char *hours = strtok(NULL, ",");
-  printf("%s %s %s\n", name, address, hours);
+  int hours_i = atoi(hours);
+  if (hours == NULL || hours_i == 0) {
+    return STATUS_ERROR;
+  }
+
+  printf("Adding employee %s, %s - %shrs\n", name, address, hours);
+  dbhdr->count++;
+  employees = realloc(employees, dbhdr->count*(sizeof(struct employee_t)));
   strncpy(employees[dbhdr->count-1].name, name, sizeof(employees[dbhdr->count-1].name));
   strncpy(employees[dbhdr->count-1].address, address, sizeof(employees[dbhdr->count-1].address));
-  employees[dbhdr->count-1].hours = atoi(hours);
+  employees[dbhdr->count-1].hours = hours_i;
+
   return STATUS_SUCCESS;
 }
 

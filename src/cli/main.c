@@ -84,7 +84,6 @@ int send_employee(int fd, char *addstr) {
     return STATUS_ERROR;
   }
 
-  printf("Succesfully added an employee \"%s\"\n", addstr);
   return STATUS_SUCCESS;
 }
 

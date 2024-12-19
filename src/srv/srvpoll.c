@@ -11,6 +11,11 @@
 #include "common.h"
 #include "srvpoll.h"
 
+void send_error(int fd, dbproto_hdr_t *hdr) {
+  hdr->type = htonl(MSG_ERROR);
+  hdr->len = htons(0);
+  write(fd, hdr, sizeof(dbproto_hdr_t));
+}
 
 void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, clientstate_t *client) {
   dbproto_hdr_t *hdr = (dbproto_hdr_t*)client->buffer;
@@ -28,9 +33,10 @@ void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, c
     hello->proto = ntohs(hello->proto);
     if (hello->proto != PROTO_VER) {
       printf("Version mismatch.\n");
-      hdr->type = htonl(MSG_ERROR);
-      hdr->len = htons(0);
-      write(client->fd, hdr, sizeof(dbproto_hdr_t));
+      // hdr->type = htonl(MSG_ERROR);
+      // hdr->len = htons(0);
+      // write(client->fd, hdr, sizeof(dbproto_hdr_t));
+      send_error(client->fd, hdr);
       return;
     }
 
@@ -45,7 +51,22 @@ void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, c
   }
 
   if (client->state == STATE_MSG) {
-    printf("Can't handle MSG yet...\n");
+    if (hdr->type == MSG_EMPLOYEE_ADD_REQ) {
+      dbproto_add_employee_req *employee = (dbproto_add_employee_req *)&hdr[1];
+
+      if (add_employee(dbhdr, employees, (char *)employee->data) != STATUS_SUCCESS) {
+        printf("Failed to add an employee\n");
+        send_error(client->fd, hdr);
+        return;
+      } else {
+        hdr->type = htonl(MSG_EMPLOYEE_ADD_RESP);
+        hdr->len = htons(1);
+        dbproto_add_employee_resp *employee = (dbproto_add_employee_resp *)&hdr[1];
+        employee->id = htons(dbhdr->count);
+        write(client->fd, hdr, sizeof(dbproto_hdr_t) + sizeof(dbproto_add_employee_resp));
+        printf("Handled MSG_EMPLOYEE_ADD_REQ\n");
+      }
+    }
   }
 }
 

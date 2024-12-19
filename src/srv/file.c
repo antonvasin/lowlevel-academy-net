@@ -8,7 +8,6 @@
 #include "file.h"
 #include "common.h"
 
-
 int create_db_file(char *filename) {
   int fd = open(filename, O_RDONLY);
   if (fd != -1) {

@@ -36,4 +36,8 @@ typedef struct {
   uint8_t data[1024];
 } dbproto_add_employee_req;
 
+typedef struct {
+  uint16_t id;
+} dbproto_add_employee_resp;
+
 #endif
