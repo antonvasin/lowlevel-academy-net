@@ -37,11 +37,9 @@ int send_hello(int fd) {
   hello->proto = htons(hello->proto);
 
   // send hello message
-  printf("Sending MSG_HELLO_REQ\n");
   write(fd, buf, sizeof(dbproto_hdr_t) + sizeof(dbproto_hello_req));
 
   // wait for the response
-  printf("Receiving MSG_HELLO_RESP\n");
   read(fd, buf, sizeof(buf));
 
   // parse the response

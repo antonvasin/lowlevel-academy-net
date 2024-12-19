@@ -24,7 +24,6 @@ void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, c
       // TODO: send error msg
     }
 
-    printf("Receiving MSG_HELLO_REQ\n");
     dbproto_hello_req* hello = (dbproto_hello_req*)&hdr[1];
     hello->proto = ntohs(hello->proto);
     if (hello->proto != PROTO_VER) {
@@ -35,7 +34,6 @@ void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, c
       return;
     }
 
-    printf("Sending MSG_HELLO_RESP\n");
     hdr->type = htonl(MSG_HELLO_RESP);
     hdr->len = htons(1);
     dbproto_hello_resp *hello_resp = (dbproto_hello_resp *)&hdr[1];
