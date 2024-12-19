@@ -19,19 +19,43 @@ typedef struct {
   unsigned short len;
 } proto_hdr_t;
 
-void send_hello(int fd) {
+int send_hello(int fd) {
   char buf[BUF_SIZE] = {0};
 
   dbproto_hdr_t *hdr = (dbproto_hdr_t *)buf;
   hdr->type = MSG_HELLO_REQ;
   hdr->len = 1;
 
+  // buf: [type][len][proto]
+  //      ↑          ↑
+  //      hdr        hello
+  dbproto_hello_req *hello = (dbproto_hello_req*)&hdr[1];
+  hello->proto = PROTO_VER;
+
   hdr->type = htonl(hdr->type);
   hdr->len = htons(hdr->len);
+  hello->proto = htons(hello->proto);
 
-  write(fd, buf, sizeof(dbproto_hdr_t));
+  // send hello message
+  printf("Sending MSG_HELLO_REQ\n");
+  write(fd, buf, sizeof(dbproto_hdr_t) + sizeof(dbproto_hello_req));
 
-  printf("Server connected. Protocol v1.\n");
+  // wait for the response
+  printf("Receiving MSG_HELLO_RESP\n");
+  read(fd, buf, sizeof(buf));
+
+  // parse the response
+  hdr->type = ntohl(hdr->type);
+  hdr->len = ntohs(hdr->len);
+
+  if (hdr->type == MSG_ERROR) {
+    printf("Server responded with error\n");
+    close(fd);
+    return STATUS_ERROR;
+  }
+
+  printf("Connected to server using protocol v1.\n");
+  return STATUS_SUCCESS;
 }
 
 void print_usage(char * argv[]) {
@@ -82,7 +106,9 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  send_hello(fd);
+  if (send_hello(fd) != STATUS_SUCCESS) {
+    return -1;
+  }
 
   close(fd);
 

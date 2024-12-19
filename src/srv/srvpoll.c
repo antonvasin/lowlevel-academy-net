@@ -11,6 +11,7 @@
 #include "common.h"
 #include "srvpoll.h"
 
+
 void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, clientstate_t *client) {
   dbproto_hdr_t *hdr = (dbproto_hdr_t*)client->buffer;
 
@@ -23,14 +24,26 @@ void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, c
       // TODO: send error msg
     }
 
+    printf("Receiving MSG_HELLO_REQ\n");
     dbproto_hello_req* hello = (dbproto_hello_req*)&hdr[1];
     hello->proto = ntohs(hello->proto);
     if (hello->proto != PROTO_VER) {
       printf("Version mismatch.\n");
-      // TODO: send error
+      hdr->type = htonl(MSG_ERROR);
+      hdr->len = htons(0);
+      write(client->fd, hdr, sizeof(dbproto_hdr_t));
+      return;
     }
 
+    printf("Sending MSG_HELLO_RESP\n");
+    hdr->type = htonl(MSG_HELLO_RESP);
+    hdr->len = htons(1);
+    dbproto_hello_resp *hello_resp = (dbproto_hello_resp *)&hdr[1];
+    hello_resp->proto = htons(PROTO_VER);
+    write(client->fd, hdr, sizeof(dbproto_hdr_t));
+
     client->state = STATE_MSG;
+    printf("Client upgraded to STATE_MSG\n");
   }
 
   if (client->state == STATE_MSG) {

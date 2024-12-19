@@ -111,7 +111,9 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
         close(conn_fd);
       } else {
         g_client_states[freeSlot].fd = conn_fd;
-        g_client_states[freeSlot].state = STATE_CONNECTED;
+        // FIXME: it workd with HELLO but shouldn't it be CONNECTED first and
+        // then hello?
+        g_client_states[freeSlot].state = STATE_HELLO;
         printf("Slot %d has client %d\n", freeSlot, conn_fd);
         nfds++;
       }
@@ -144,8 +146,6 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
           }
           // Handle request
         } else {
-          // printf("Received data from the client: %s\n", g_client_states[slot].buffer);
-
           handle_client_fsm(dbhdr, emplyees, &g_client_states[slot]);
         }
       }
