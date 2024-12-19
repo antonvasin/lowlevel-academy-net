@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -56,19 +57,52 @@ int send_hello(int fd) {
   return STATUS_SUCCESS;
 }
 
+int send_employee(int fd, char *addstr) {
+  char buf[BUF_SIZE] = {0};
+  dbproto_hdr_t *hdr = (dbproto_hdr_t *)buf;
+  hdr->type = MSG_EMPLOYEE_ADD_REQ;
+  hdr->len = 1;
+
+  dbproto_add_employee_req *employee = (dbproto_add_employee_req *)&hdr[1];
+  strncpy(&employee->data, addstr, sizeof(employee->data));
+
+  hdr->type = htonl(hdr->type);
+  hdr->len = htons(hdr->len);
+
+  // [       type         ][len][          addstr             ]
+  // [MSG_EMPLOYEE_ADD_REQ][ 1 ][John Smith,123 Parkway Dr.,50]
+  write(fd, buf, sizeof(dbproto_hdr_t) + sizeof(dbproto_add_employee_req));
+
+  read(fd, buf, sizeof(buf));
+
+  hdr->type = ntohl(hdr->type);
+  hdr->len = ntohs(hdr->len);
+
+  if (hdr->type == MSG_ERROR) {
+    printf("Error adding an employee \"%s\"\n", addstr);
+    close(fd);
+    return STATUS_ERROR;
+  }
+
+  printf("Succesfully added an employee \"%s\"\n", addstr);
+  return STATUS_SUCCESS;
+}
+
 void print_usage(char * argv[]) {
   printf("Usage: %s -h <host> -p <port>\n", argv[0]);
   printf("\t-h - (required) host to connect to\n");
   printf("\t-p - (required) port to use\n");
+  printf("\t-a - add an employee\n");
   return;
 }
 
 int main(int argc, char *argv[]) {
   char *host = NULL;
+  char *addstring = NULL;
   int port = -1;
   int c;
 
-  while ((c = getopt(argc, argv, "h:p:")) != -1) {
+  while ((c = getopt(argc, argv, "h:p:a:")) != -1) {
     switch (c) {
       case 'h':
         host = optarg;
@@ -76,6 +110,11 @@ int main(int argc, char *argv[]) {
       case 'p':
         port = atoi(optarg);
         break;
+      case 'a':
+        addstring = optarg;
+        break;
+      case '?':
+        printf("Unknown option -%c\n", c);
       default:
         return -1;
     }
@@ -106,6 +145,10 @@ int main(int argc, char *argv[]) {
 
   if (send_hello(fd) != STATUS_SUCCESS) {
     return -1;
+  }
+
+  if (addstring) {
+    send_employee(fd, addstring);
   }
 
   close(fd);
