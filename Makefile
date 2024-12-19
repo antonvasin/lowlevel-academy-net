@@ -9,11 +9,19 @@ OBJ_CLI = $(SRC_CLI:src/cli/%.c=obj/cli/%.o)
 
 PORT = 5555
 
-run: clean default
-	./$(TARGET_SRV) -f ./mynewdb.db -n -p $(PORT) &
-	./$(TARGET_CLI) -h 127.0.0.1 -p $(PORT)
-	kill -9 $$(pidof dbserver)
+# run: clean default
+# 	./$(TARGET_SRV) -f ./mynewdb.db -n -p $(PORT) &
+# 	./$(TARGET_CLI) -h 127.0.0.1 -p $(PORT)
+# 	kill -9 $$(pidof dbserver)
 
+run: clean default
+	@trap 'kill $$(jobs -p) 2>/dev/null' EXIT; \
+	{ \
+		./$(TARGET_SRV) -f ./mynewdb.db -n -p $(PORT) & \
+		server_pid=$$!; \
+		sleep 1; \
+		{ timeout 2s ./$(TARGET_CLI) -h 127.0.0.1 -p $(PORT) || true; } \
+	}
 default: $(TARGET_SRV) $(TARGET_CLI)
 
 clean:
