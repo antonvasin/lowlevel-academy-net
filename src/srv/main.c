@@ -29,7 +29,7 @@ void print_usage(char *argv[]) {
   return;
 }
 
-void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t *emplyees) {
+void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t *emplyees, int dbfd) {
   int listen_fd, conn_fd, freeSlot;
   struct sockaddr_in server_addr, client_addr;
   socklen_t client_len = sizeof(client_addr);
@@ -146,7 +146,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
           }
           // Handle request
         } else {
-          handle_client_fsm(dbhdr, emplyees, &g_client_states[slot]);
+          handle_client_fsm(dbhdr, emplyees, &g_client_states[slot], dbfd);
         }
       }
     }
@@ -155,18 +155,14 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
 
 int main(int argc, char *argv[]) {
   char *filepath = NULL;
-  char *addstring = NULL;
-  char *removestring = NULL;
-  char *updatestring = NULL;
   bool newfile = false;
-  bool list = false;
   int port = -1;
   int c;
   int dbfd = -1;
   struct dbheader_t *dbhdr = NULL;
   struct employee_t *employees = NULL;
 
-  while ((c = getopt(argc, argv, "nf:p:a:lr:u:")) != -1) {
+  while ((c = getopt(argc, argv, "nf:p:")) != -1) {
     switch (c) {
       case 'n':
         newfile = true;
@@ -176,18 +172,6 @@ int main(int argc, char *argv[]) {
         break;
       case 'p':
         port = atoi(optarg);
-        break;
-      case 'a':
-        addstring = optarg;
-        break;
-      case 'l':
-        list = true;
-        break;
-      case 'r':
-        removestring = optarg;
-        break;
-      case 'u':
-        updatestring = optarg;
         break;
       case '?':
         print_usage(argv);
@@ -240,27 +224,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  if (addstring) {
-    dbhdr->count++;
-    employees = realloc(employees, dbhdr->count*(sizeof(struct employee_t)));
-    add_employee(dbhdr, employees, addstring);
-  }
-
-  if (updatestring) {
-    update_employee(dbhdr, employees, updatestring);
-  }
-
-  if (removestring) {
-    remove_employee(dbhdr, employees, removestring);
-  }
-
-  if (list) {
-    list_employees(dbhdr, employees);
-  }
-
-  poll_loop(port, dbhdr, employees);
-
-  output_file(dbfd, dbhdr, employees);
+  poll_loop(port, dbhdr, employees, dbfd);
 
   return 0;
 }

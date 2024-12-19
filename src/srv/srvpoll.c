@@ -17,7 +17,7 @@ void send_error(int fd, dbproto_hdr_t *hdr) {
   write(fd, hdr, sizeof(dbproto_hdr_t));
 }
 
-void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, clientstate_t *client) {
+void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, clientstate_t *client, int dbfd) {
   dbproto_hdr_t *hdr = (dbproto_hdr_t*)client->buffer;
 
   hdr->type = ntohl(hdr->type);
@@ -54,7 +54,7 @@ void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, c
     if (hdr->type == MSG_EMPLOYEE_ADD_REQ) {
       dbproto_add_employee_req *employee = (dbproto_add_employee_req *)&hdr[1];
 
-      if (add_employee(dbhdr, employees, (char *)employee->data) != STATUS_SUCCESS) {
+      if (add_employee(dbhdr, &employees, (char *)employee->data) != STATUS_SUCCESS) {
         printf("Failed to add an employee\n");
         send_error(client->fd, hdr);
         return;
@@ -64,6 +64,7 @@ void handle_client_fsm(struct dbheader_t *dbhdr, struct employee_t *employees, c
         dbproto_add_employee_resp *employee = (dbproto_add_employee_resp *)&hdr[1];
         employee->id = htons(dbhdr->count);
         write(client->fd, hdr, sizeof(dbproto_hdr_t) + sizeof(dbproto_add_employee_resp));
+        output_file(dbfd, dbhdr, employees);
         printf("Handled MSG_EMPLOYEE_ADD_REQ\n");
       }
     }

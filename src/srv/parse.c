@@ -20,7 +20,7 @@ void list_employees(struct dbheader_t *dbhdr, struct employee_t *employees) {
   }
 }
 
-int add_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *addstring) {
+int add_employee(struct dbheader_t *dbhdr, struct employee_t **employeesptr, char *addstring) {
 
   char *name = strtok(addstring, ",");
   if (name == NULL) {
@@ -40,7 +40,10 @@ int add_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *a
 
   printf("Adding employee %s, %s - %shrs\n", name, address, hours);
   dbhdr->count++;
-  employees = realloc(employees, dbhdr->count*(sizeof(struct employee_t)));
+
+  *employeesptr = realloc(*employeesptr, dbhdr->count*(sizeof(struct employee_t)));
+  struct employee_t *employees = *employeesptr;
+
   strncpy(employees[dbhdr->count-1].name, name, sizeof(employees[dbhdr->count-1].name));
   strncpy(employees[dbhdr->count-1].address, address, sizeof(employees[dbhdr->count-1].address));
   employees[dbhdr->count-1].hours = hours_i;
@@ -140,6 +143,12 @@ int output_file(int fd, struct dbheader_t *dbhdr, struct employee_t *employees) 
   }
 
   ftruncate(fd, sizeof(struct dbheader_t) + realcount * sizeof(struct employee_t));
+
+  // Put data back into host endianness
+  dbhdr->magic = ntohl(dbhdr->magic);
+  dbhdr->filesize = ntohl(sizeof(struct dbheader_t) + (sizeof(struct employee_t)) * realcount);
+  dbhdr->count = ntohs(dbhdr->count);
+  dbhdr->version = ntohs(dbhdr->version);
 
   return STATUS_SUCCESS;
 }
