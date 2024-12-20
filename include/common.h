@@ -40,4 +40,10 @@ typedef struct {
   uint16_t id;
 } dbproto_add_employee_resp;
 
+typedef struct {
+  uint8_t name[256];
+  uint8_t address[256];
+  uint32_t hours;
+} dbproto_employee_list_resp;
+
 #endif

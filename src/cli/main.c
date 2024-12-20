@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -87,21 +88,55 @@ int send_employee(int fd, char *addstr) {
   return STATUS_SUCCESS;
 }
 
+int send_list_employees(int fd) {
+  char buf[BUF_SIZE] = {0};
+  dbproto_hdr_t *hdr = (dbproto_hdr_t *)buf;
+  hdr->type = htonl(MSG_EMPLOYEE_LIST_REQ);
+  hdr->len = htons(0);
+
+  printf("Sending MSG_EMPLOYEE_LIST_REQ\n");
+  write(fd, hdr, sizeof(proto_hdr_t));
+
+  read(fd, buf, sizeof(dbproto_hdr_t));
+
+  hdr->type = ntohl(hdr->type);
+  hdr->len = ntohs(hdr->len);
+
+  if (hdr->type != MSG_EMPLOYEE_LIST_RESP) {
+    printf("Error listing the employees\n");
+    close(fd);
+    return STATUS_ERROR;
+  }
+
+  printf("Received MSG_EMPLOYEE_LIST_RESP\n");
+  dbproto_employee_list_resp *employee = (dbproto_hello_req *)&hdr[1];
+
+  for (int i = 0; i < hdr->len; i++) {
+    read(fd, employee, sizeof(dbproto_employee_list_resp));
+    employee->hours = ntohl(employee->hours);
+    printf("Employee %d: %s, %s - %dhrs", i, employee->name, employee->address, employee->hours);
+  }
+
+  return EXIT_SUCCESS;
+}
+
 void print_usage(char * argv[]) {
   printf("Usage: %s -h <host> -p <port>\n", argv[0]);
   printf("\t-h - (required) host to connect to\n");
   printf("\t-p - (required) port to use\n");
   printf("\t-a - add an employee\n");
+  printf("\t-l - get list of employees\n");
   return;
 }
 
 int main(int argc, char *argv[]) {
   char *host = NULL;
   char *addstring = NULL;
+  bool listarg = false;
   int port = -1;
   int c;
 
-  while ((c = getopt(argc, argv, "h:p:a:")) != -1) {
+  while ((c = getopt(argc, argv, "h:p:a:l")) != -1) {
     switch (c) {
       case 'h':
         host = optarg;
@@ -111,6 +146,9 @@ int main(int argc, char *argv[]) {
         break;
       case 'a':
         addstring = optarg;
+        break;
+      case 'l':
+        listarg = true;
         break;
       case '?':
         printf("Unknown option -%c\n", c);
@@ -148,6 +186,10 @@ int main(int argc, char *argv[]) {
 
   if (addstring) {
     send_employee(fd, addstring);
+  }
+
+  if (listarg && send_list_employees(fd) != STATUS_SUCCESS) {
+    printf("Error getting list of employees\n");
   }
 
   close(fd);
