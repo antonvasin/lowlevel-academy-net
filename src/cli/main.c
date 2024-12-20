@@ -64,7 +64,7 @@ int send_employee(int fd, char *addstr) {
   hdr->len = 1;
 
   dbproto_add_employee_req *employee = (dbproto_add_employee_req *)&hdr[1];
-  strncpy(&employee->data, addstr, sizeof(employee->data));
+  memcpy(employee->data, addstr, sizeof(employee->data));
 
   hdr->type = htonl(hdr->type);
   hdr->len = htons(hdr->len);
