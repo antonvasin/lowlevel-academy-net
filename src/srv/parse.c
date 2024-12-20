@@ -20,7 +20,7 @@ void list_employees(struct dbheader_t *dbhdr, struct employee_t *employees) {
   }
 }
 
-int add_employee(struct dbheader_t *dbhdr, struct employee_t **employeesptr, char *addstring) {
+int add_employee(struct dbheader_t *dbhdr, struct employee_t **employeeptr, char *addstring) {
 
   char *name = strtok(addstring, ",");
   if (name == NULL) {
@@ -41,8 +41,8 @@ int add_employee(struct dbheader_t *dbhdr, struct employee_t **employeesptr, cha
   printf("Adding employee %s, %s - %shrs\n", name, address, hours);
   dbhdr->count++;
 
-  *employeesptr = realloc(*employeesptr, dbhdr->count*(sizeof(struct employee_t)));
-  struct employee_t *employees = *employeesptr;
+  *employeeptr = realloc(*employeeptr, dbhdr->count*(sizeof(struct employee_t)));
+  struct employee_t *employees = *employeeptr;
 
   strncpy(employees[dbhdr->count-1].name, name, sizeof(employees[dbhdr->count-1].name));
   strncpy(employees[dbhdr->count-1].address, address, sizeof(employees[dbhdr->count-1].address));
@@ -105,7 +105,7 @@ int read_employees(int fd, struct dbheader_t *dbhdr, struct employee_t **employe
 
   struct employee_t *employees = calloc(count, sizeof(struct employee_t));
 	if (employees == (void*)-1) {
-    printf("malloc failed\n");
+    perror("malloc");
     return STATUS_ERROR;
   }
 

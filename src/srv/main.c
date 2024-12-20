@@ -29,7 +29,7 @@ void print_usage(char *argv[]) {
   return;
 }
 
-void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t *emplyees, int dbfd) {
+void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t *employees, int dbfd) {
   int listen_fd, conn_fd, freeSlot;
   struct sockaddr_in server_addr, client_addr;
   socklen_t client_len = sizeof(client_addr);
@@ -146,7 +146,7 @@ void poll_loop(unsigned short port, struct dbheader_t *dbhdr, struct employee_t 
           }
           // Handle request
         } else {
-          handle_client_fsm(dbhdr, emplyees, &g_client_states[slot], dbfd);
+          handle_client_fsm(dbhdr, &employees, &g_client_states[slot], dbfd);
         }
       }
     }
