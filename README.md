@@ -2,7 +2,11 @@
 
 Implementing simple networked DB using multiplexing.
 
-[Tldraw project](https://www.tldraw.com/r/51CAWWFyOWjvMcgC_AUAl?d=v2048.-400.3907.2470.page)
+```
+make
+./bin/dbserver -f ./mynewdb.db -p 5555
+./bin/dbcli -h 127.0.0.1 -p 5555 -l
+```
 
 ## Blocking Requests
 
