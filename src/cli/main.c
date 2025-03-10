@@ -102,19 +102,22 @@ int send_list_employees(int fd) {
   hdr->type = ntohl(hdr->type);
   hdr->len = ntohs(hdr->len);
 
-  if (hdr->type != MSG_EMPLOYEE_LIST_RESP) {
+  if (hdr->type == MSG_ERROR) {
     printf("Error listing the employees\n");
     close(fd);
     return STATUS_ERROR;
   }
 
-  printf("Received MSG_EMPLOYEE_LIST_RESP\n");
-  dbproto_employee_list_resp *employee = (dbproto_hello_req *)&hdr[1];
+  if (hdr->type == MSG_EMPLOYEE_LIST_RESP) {
+    printf("Received MSG_EMPLOYEE_LIST_RESP\n");
+    dbproto_employee_list_resp *employee = (dbproto_hello_req *)&hdr[1];
 
-  for (int i = 0; i < hdr->len; i++) {
-    read(fd, employee, sizeof(dbproto_employee_list_resp));
-    employee->hours = ntohl(employee->hours);
-    printf("Employee %d: %s, %s - %dhrs", i, employee->name, employee->address, employee->hours);
+    int i = 0;
+    for (; i < hdr->len; i++) {
+      read(fd, employee, sizeof(dbproto_employee_list_resp));
+      employee->hours = ntohl(employee->hours);
+      printf("\tEmployee %d: %s, %s - %dhrs\n", i, employee->name, employee->address, employee->hours);
+    }
   }
 
   return EXIT_SUCCESS;
